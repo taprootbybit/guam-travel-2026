@@ -566,38 +566,62 @@ function switchTab(name, btn) {
   btn.classList.add('active');
 }
 
-// ── 체크 상태 (메모리) ──
-var checkedState = {};
+// ── 원래 아이콘 맵 ──
+var defaultIcons = { done: '✓', todo: '○', warn: '!', info: 'i' };
 
-// 초기 상태: checked 클래스가 이미 붙은 항목은 true로 세팅
-document.querySelectorAll('.cl-item.checked').forEach(function(item) {
-  checkedState[item.dataset.id] = true;
-});
+function getOrigType(item) {
+  var cls = item.querySelector('.cl-check').className;
+  var m = cls.match(/type-(\w+)/);
+  return m ? m[1] : 'todo';
+}
 
-// 클릭 이벤트
+// ── localStorage 저장/불러오기 ──
+var STORAGE_KEY = 'guam2026_checklist';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function saveState(state) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e) {}
+}
+
+// ── 초기화 ──
+var checkedState = loadState();
+
 document.querySelectorAll('.cl-item').forEach(function(item) {
+  var id = item.dataset.id;
+
+  // HTML에 checked 클래스가 있으면 기본값 true (아직 저장 안 된 경우)
+  if (checkedState[id] === undefined && item.classList.contains('checked')) {
+    checkedState[id] = true;
+  }
+
+  // 저장된 상태 반영
+  applyState(item, !!checkedState[id]);
+
+  // 클릭 이벤트
   item.addEventListener('click', function(e) {
-    // 링크 클릭 시 체크 동작 방지
     if (e.target.tagName === 'A') return;
-
-    var id = item.dataset.id;
     checkedState[id] = !checkedState[id];
-
-    if (checkedState[id]) {
-      item.classList.add('checked');
-      item.querySelector('.cl-check').textContent = '✓';
-    } else {
-      item.classList.remove('checked');
-      // 원래 아이콘 복원
-      var origIcon = item.querySelector('.cl-check');
-      var type = origIcon.className.replace('cl-check type-','').split(' ')[0];
-      var icons = { done: '✓', todo: '○', warn: '!', info: 'i' };
-      origIcon.textContent = icons[type] || '○';
-    }
-
+    applyState(item, checkedState[id]);
+    saveState(checkedState);
     updateProgress();
   });
 });
+
+function applyState(item, isChecked) {
+  var icon = item.querySelector('.cl-check');
+  if (isChecked) {
+    item.classList.add('checked');
+    icon.textContent = '✓';
+  } else {
+    item.classList.remove('checked');
+    icon.textContent = defaultIcons[getOrigType(item)] || '○';
+  }
+}
 
 // ── 진행률 업데이트 ──
 function updateProgress() {
@@ -615,7 +639,8 @@ function updateProgress() {
   }
 }
 
-// 초기 진행률
+// ── 초기 진행률 계산 ──
+saveState(checkedState);
 updateProgress();
 </script>
 </body>
